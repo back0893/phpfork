@@ -219,7 +219,9 @@ class Base
      */
     public function __construct()
     {
+        //读取配置
         self::$_config = require(dirname(__DIR__) . '/Config/Main.php');
+        //获取开始时间
         self::$_start_time = Tool::getNowTime(false); 
     }
 
@@ -227,6 +229,7 @@ class Base
      * @brief    check PHP_SAPI execute environment necessary
      *
      * @return   true | exit
+     * 检查环境是否可以运行
      */
     static protected function checkSapiExecuteEnvironment()
     {
@@ -255,6 +258,7 @@ class Base
         if(!self::$daemonize) return;
 
         //set max privilege to file 0666 and dir 0777
+        //设置默认权限,设置所有说文件,文件夹都是全部权限
         umask(0);
 
         //fork for the first time
@@ -263,9 +267,14 @@ class Base
         $pid > 0 && exit(0);
 
         //setsid to be a leader
+        //设置当前进程是一个进程组长,处了这个pid之外谁也不能控制这组进程
         posix_setsid() === -1 && self::showHelpByeBye('Daemonize: setsid failded');
 
         //fork again avoid SVR4 system regain the control of terminal
+        //@url https://segmentfault.com/a/1190000007420468#articleHeader10
+        //这里解释了为啥要fork2次
+        //第一次fork是为了获得一个脱离终端的独立进程,并且重新设置一个进程组
+        //第二次fork是防止新获得进程组去打开终端
         $pid = pcntl_fork();
         $pid === -1 && self::showHelpByeBye('Daemonize: fork faild');
         $pid > 0 && exit(0);
@@ -585,7 +594,7 @@ EOT;
      *
      * @return   boolean
      */
-    static private function setOutputStream($stream = null)
+    static protected function setOutputStream($stream = null)
     {
         if(!$stream) 
         {
@@ -798,6 +807,8 @@ EOT;
     static public function checkIfMasterIsAlive()
     {
         $master_pid = self::getMasterPid();
+        //posix_kill 会想pid发送一个信号,
+        //posix_getpid会返回当前进程的pid
         $master_is_alive = $master_pid && posix_kill($master_pid, 0) && posix_getpid() != $master_pid;
 
         return $master_is_alive;

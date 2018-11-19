@@ -140,17 +140,20 @@ class Container extends Base
 	{
         parent::__construct();
 
+        //获取当前容器的hash_id
 		$this->hashId = spl_object_hash($this);
+		//保存一个静态数组
 		self::$_containers[$this->hashId] = $this;
+		//pid的的子进程的字典
         self::$_pidMap[$this->hashId]  = array();
 
         if(!empty($socket_name)) 
         {
             if(!isset($context_option['socket']['backlog'])) 
             {
+                //用来配置tcp的可以接受连接的队列大小
                 $context_option['socket']['backlog'] = self::$_config['socket']['backlog'];
             }
-
             $this->_context = stream_context_create($context_option);
             $this->_socketName = $socket_name;
         }
@@ -163,10 +166,16 @@ class Container extends Base
      */
     static public function start()
     {
+        //检查运行环境是否可以运行
         self::checkSapiExecuteEnvironment();
+        //初始化
         self::init();
+        //解析cli模式下的命令行输入
+        //这里如果是reload或者stop就退出了,不会再继续执行了.
         self::parseTerminalCommand();
+
         self::daemonize();
+
 		self::startContainers();
 		self::displayGui();
         self::saveMasterPid();
@@ -193,17 +202,21 @@ class Container extends Base
     static protected function init()
     {
         //locate start file
+        //调用栈堆,获取当前的文件路径..其实这个可以用__file__解决吧,,
         $backtrace        = debug_backtrace();
         self::$_startFile = $backtrace[count($backtrace) - 1]['file'];
-
+        echo '===========>init'.self::$_startFile.PHP_EOL;
         //init log dir
+        //为日志创建文件夹
         Tool::createMultiDirectory(LOG_DIR);
 
         //init master pid file
+        //设置保存主进程的pid文件路径
         $unique_prefix = str_replace('/', '_', self::$_startFile);
         empty(self::$masterPidFile) && self::$masterPidFile = LOG_DIR . "/{$unique_prefix}.pid";
 
         //init log file
+        //初试话日志的保存路径
         empty(self::$logFile) && self::$logFile = LOG_DIR . '/container.log';
         $log_file = (string)self::$logFile;
         if(!is_file($log_file)) 
@@ -213,15 +226,19 @@ class Container extends Base
         }
 
         //init container state
+        //初始化容器状态
         self::$_status = self::STATUS_STARTING;
 
         //init process title
+        //为进程设置名称
         self::setProcessTitle('PHPForker: master process  start_file=' . self::$_startFile);
 
         //init container id
+        //扩展容器点子进程数组
         self::initContainerId();
 
         //init timer
+        //定时器的初始化,目前可以忽略
         Timer::init();
     }
 
@@ -232,6 +249,8 @@ class Container extends Base
      */
     static protected function parseTerminalCommand()
     {
+        //获得全局下的命令行输入
+        //0总是文件名
         global $argv;
         $start_file = $argv[0];
         $available_commands = array('start', 'stop', 'reboot', 'reload');
@@ -260,8 +279,10 @@ class Container extends Base
         self::$_start_mode_text = "Container [$start_file] $command1 $mode";
 
         //get master process pid and check if master process is alive
+        //获得主进程的pid
+        //如果 进程pid不为0 并且信号指令可以发送成功,并且当前进程和保存的进程id一直 那么主进程是存活的
         $master_pid = self::getMasterPid();
-        if(self::checkIfMasterIsAlive()) 
+        if(self::checkIfMasterIsAlive())
         {
             $command1 === 'start' && self::showHelpByeBye("Container [$start_file] is already running");
         } 
@@ -280,6 +301,7 @@ class Container extends Base
                 //reboot log 
                 $command1 == 'reboot' && self::log("Container [$start_file] reboot ...");
 
+                //平滑停止,和直接停止传入的信号不一样
                 if(self::$_gracefulStop) 
                 {
                     $signal = SIGTERM;
@@ -290,15 +312,16 @@ class Container extends Base
                     $signal = SIGINT;
                     self::log("Container [$start_file] is stopping ...");
                 }
-
                 //send stop signal to master process
                 $master_pid && posix_kill($master_pid, $signal);
+
 
                 //check if master process is still alive
                 $start_time = time();
                 while(1) 
                 {
-                    if(self::checkIfMasterIsAlive()) 
+                    if(self::checkIfMasterIsAlive())
+                    //检查是否终止进程,如果失败提示
                     {
                         if(!self::$_gracefulStop && time() - $start_time >= self::$_config['timeout']['process']) 
                         {
@@ -310,12 +333,15 @@ class Container extends Base
 
                     //stop success
                     self::log("Container [$start_file] stop success");
+                    //如果命令是stop就退出当前进程
                     $command1 === 'stop' && exit(0);
                     break;
                 }
                 break;
             case 'reload':
+                //重启也是是否平滑重启来重启
                 $signal = self::$_gracefulStop ? SIGQUIT : SIGUSR1;
+                self::log("Container is reloading ... by {$signal}");
                 posix_kill($master_pid, $signal);
                 exit;
             default:

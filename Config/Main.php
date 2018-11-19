@@ -24,7 +24,7 @@ date_default_timezone_set("Asia/Shanghai");
 !defined('APP_ID') && define("APP_ID", 'phpforker');
 
 //文件缓存目录: 请自行配置
-!defined('CACHE_DIR') && define("CACHE_DIR", "/tmp/" . APP_ID);
+!defined('CACHE_DIR') && define("CACHE_DIR", ROOT_DIR."/tmp/" . APP_ID);
 
 //日志目录: 请自行配置
 !defined('LOG_DIR') && define("LOG_DIR", CACHE_DIR . "/logs");
