@@ -181,10 +181,19 @@ class Container extends Base
         //启动容器中所有容器
 		self::startContainers();
 
+		//shell 命令展示
 		self::displayGui();
+
+		//保存主进程id
         self::saveMasterPid();
+
+        //安装信号通知,主要是主进程上注册各种各样的信号处理
         self::installSignal();
+
+        //依据数量fork多个子进程
         self::forkContainers();
+
+
         self::monitorContainers();
 	}
 
@@ -402,6 +411,7 @@ class Container extends Base
 			}
 			//上面都是设置name,user,显示
             //listen用来启动监听端口
+            //使用stream_set_server 创建一个不阻塞的流服务
             //start listen
             $container->listen();
         }
@@ -414,8 +424,10 @@ class Container extends Base
      */
     static protected function saveMasterPid()
     {
+        //获取当前进程pid
         self::$_masterPid = posix_getpid();
 
+        //将主进程pid保存到文件中
         if(false === file_put_contents(self::$masterPidFile, self::$_masterPid)) 
         {
             self::showHelpByeBye('failed to save pid to ' . self::$masterPidFile);
@@ -481,33 +493,42 @@ class Container extends Base
     static protected function forkOneChildContainer($container)
     {
         //get one available container id
+        //这个用来返回应该替换的数组子进程的pid
         $id = self::getOneContainerId($container->hashId, 0);
         if($id === false)  return;
 
+        //
         $pid = pcntl_fork();
         $pid < 0 && self::showHelpByeBye("forkOneChildContainer fail");
 
         if($pid > 0) 
         {
+            //主进程,保存子进程的pid
             self::$_pidMap[$container->hashId][$pid] = $pid;
             self::$_idMap[$container->hashId][$id]   = $pid;
         } 
         elseif(0 === $pid) 
         {
             //clear all timer
+            //子进程首先清楚在主进程上的定时器
             Timer::delAll();
 
             self::log("child__pid: " . posix_getpid() . " 子进程创建成功($container->name)");
+            //如果实在开始阶段,子进程的输出需要重定向
             self::$_status === self::STATUS_STARTING && self::resetStd();
             self::$_pidMap = self::$_idMap = array();
 
             //remove other listener
+            //因为子进程中有其他容器的复制,所以这个复制的对象也监听对应的端口
+            //所以在子进程中,解除监听,并且删除其他容器对象
             self::removeOtherListener($container);
 
             $title = 'PHPForker: child process ' . $container->name . ' ' . $container->getSocketName();
             self::setProcessTitle($title);
+            //依据配置设置子进程用户和用户组
             $container->setUserAndGroup();
             $container->id = $id;
+            //run这里,子进程会被阻塞
             $container->run();
             $err = new Exception('child process exit unexpected...');
             self::log($err);
@@ -561,17 +582,22 @@ class Container extends Base
     public function run()
     {
         //update process state
+        //更新子进程的运行状态
         self::$_status = self::STATUS_RUNNING;
 
         //register shutdown function for checking errors
+        //注册一个用于全局捕捉致命错误的函数
         register_shutdown_function(array("\\PHPForker\\Container", 'checkErrors'));
 
         //set autoload root path
+        //子进程自己设置自动自动载入的路径
         Autoloader::setRootPath($this->_autoloadRootPath);
 
         //reinstall signal
+        //子进程重新注册信号
         self::reinstallSignal();
 
+        //子进程,重置错误处理
         restore_error_handler();
         
         //main loop ready for accept connection from client
@@ -937,7 +963,7 @@ class Container extends Base
                 self::showHelpByeBye('only support TCP & UDP protocol currently ...');
             }
 
-            //如果是其他协议,使用namespace来导入
+            //如果是其他协议,使用namespace来导入,workerman是那样实现的
 
             //设置协议名称
             $this->transport = $scheme;

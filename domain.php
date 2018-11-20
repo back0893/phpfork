@@ -7,10 +7,10 @@
  * 测试后台守护进程
  */
 
-//fork 第一次
 
 
 umask(0);
+//fork 第一次
 $pid=pcntl_fork();
 
 if($pid==-1){
@@ -30,13 +30,18 @@ elseif($pid>0){
     }elseif ($pid>0){
         exit(0);
     }else{
-//        echo 'write log'.PHP_EOL;
+        //实现一个控制,来在其他地方停止这个守护进程
+        pcntl_async_signals(true);
+        pcntl_signal(SIGINT,function($signo){
+            echo '我死了o(ﾟДﾟ)っ啥!'.PHP_EOL;
+            exit(0);
+        });
+
         cli_set_process_title('!test_domain!');
         echo __DIR__.'/domain.log'.PHP_EOL;
         $fp=fopen(__DIR__.'/domain.log','w');
-        for($i=0;$i<20;$i++){
-            $l=fwrite($fp,'=======>'.$i.PHP_EOL);
-            echo $l.PHP_EOL;
+        for($i=0;;$i++){
+            $l=fwrite($fp,"====================>{$i}\n");
             sleep(1);
         }
         fclose($fp);

@@ -628,10 +628,13 @@ EOT;
         $signals = array(SIGINT, SIGTERM, SIGUSR1, SIGQUIT, SIGUSR2);
         foreach($signals as $signal)
         {
+            //依据文档,现在可以先注册一个信号处理,然后使用pcntl_ signal_ dispatch来进行手动调用
+            //php7可以pcntl_async_signals 来开关是否异步自动执行
             pcntl_signal($signal,  array('\PHPForker\Container', 'signalHandler'), false);
         }
 
         //ignore
+        //这个tcp关闭关有数据接受,会触发这个,默认关闭进程,这里忽略,覆盖原来的 退出进程 行为
         pcntl_signal(SIGPIPE, SIG_IGN, false);
     }
 
