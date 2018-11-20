@@ -946,12 +946,15 @@ class Container extends Base
             $local_socket = self::$_builtinTransports[$this->transport] . ":" . $address;
 
             //flag
+            //配置不同的监听产量
             $flags = $this->transport === 'udp' ? STREAM_SERVER_BIND : STREAM_SERVER_BIND | STREAM_SERVER_LISTEN;
             $errno = 0;
             $errmsg = '';
 
             //create an Internet or Unix domain server socket
+            //创建一个socket_server服务
             $this->_mainSocket = stream_socket_server($local_socket, $errno, $errmsg, $flags, $this->_context);
+            //如果创建失败,抛出错误
             if(!$this->_mainSocket) throw new \Exception($errmsg);
 
             if($this->transport === 'ssl') 
@@ -966,6 +969,11 @@ class Container extends Base
             }
 
             //try to open keepalive for tcp and disable Nagle algorithm
+            //尝试打开tcp的keepalive，关闭TCP Nagle算法
+            //socket ,stream_socket 是2个不兼容的
+            //socket更加底层,socket_import_stream 将stream_socket转成socket
+            //是用来设置keep-alive的tcp层的心跳机制,灵敏度很差，用不用差别不大
+            //https://wenda.workerman.net/question/873
             if(function_exists('socket_import_stream') && self::$_builtinTransports[$this->transport] === 'tcp') 
             {
                 set_error_handler(function(){});
@@ -976,6 +984,7 @@ class Container extends Base
             }
 
             //non blocking
+            //数据流设置不阻塞模式
             stream_set_blocking($this->_mainSocket, 0);
         }
     }
