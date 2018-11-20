@@ -167,6 +167,7 @@ class Container extends Base
     static public function start()
     {
         //检查运行环境是否可以运行
+        //进程每次fork的时候时候都会将自己复制一份
         self::checkSapiExecuteEnvironment();
         //初始化
         self::init();
@@ -174,9 +175,12 @@ class Container extends Base
         //这里如果是reload或者stop就退出了,不会再继续执行了.
         self::parseTerminalCommand();
 
+        //启动守护进程 使用ps -x 查看
         self::daemonize();
 
+        //启动容器中所有容器
 		self::startContainers();
+
 		self::displayGui();
         self::saveMasterPid();
         self::installSignal();
@@ -369,8 +373,7 @@ class Container extends Base
     }
 
     /**
-     * @brief    startContainers    
-     *
+     * @brief    startContainers
      * @return   void
      */
     static protected function startContainers()
@@ -397,7 +400,8 @@ class Container extends Base
 				$key = 'max' . ucfirst(strtolower($column_name)) . 'NameLength';
 				self::$_config['ui']['length'][$key] = max(self::$_config['ui']['length'][$key], $prop_length);
 			}
-
+			//上面都是设置name,user,显示
+            //listen用来启动监听端口
             //start listen
             $container->listen();
         }
@@ -918,10 +922,13 @@ class Container extends Base
     {
         if(!$this->_socketName) return;
 
+        //自动导入类,其实可以完全屏蔽,只使用composer的自动导入
         Autoloader::setRootPath($this->_autoloadRootPath);
 
+        //main_socket只要启动后就存在
         if(!$this->_mainSocket) 
         {
+            //依据 : 获取 协议 和 ip:port
             list($scheme, $address) = explode(':', $this->_socketName, 2);
 
             //only support tcp & udp currently
@@ -930,7 +937,12 @@ class Container extends Base
                 self::showHelpByeBye('only support TCP & UDP protocol currently ...');
             }
 
+            //如果是其他协议,使用namespace来导入
+
+            //设置协议名称
             $this->transport = $scheme;
+
+            //重新拼接socket协议
             $local_socket = self::$_builtinTransports[$this->transport] . ":" . $address;
 
             //flag
