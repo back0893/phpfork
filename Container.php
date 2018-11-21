@@ -595,6 +595,8 @@ class Container extends Base
 
         //reinstall signal
         //子进程重新注册信号
+        //解释子进程需要重新处着新的信号处理机制
+        //这里就偷懒不作处理了
         self::reinstallSignal();
 
         //子进程,重置错误处理
@@ -1096,13 +1098,17 @@ class Container extends Base
      */
     public function readyForAcceptClientConnection()
     {
-        //要监听的三个sockets数组
+        //初始化读写队列
         $read_socks = $write_socks =  array();
-        $except_socks = NULL;  
+        //出错的进程
+        $except_socks = NULL;
+        //设置需要读取的socket
         $read_socks[] = $this->_mainSocket;
 
+        //子进程不停的监听,因为是未阻塞的
         while(1)
         {
+            //这里触发其他进程发送来的信号
             pcntl_signal_dispatch();
             usleep(500000);
 
@@ -1111,6 +1117,8 @@ class Container extends Base
             $tmp_writes = $write_socks;
 
             //stream_select(array &$read , array &$write , array &$except , int $tv_sec [, int $tv_usec = 0 ])
+            //英语不好吃亏了,这个是观察传入的是否可读,可写
+            //这是用来监视传入的资源是不是可以读写的,只有可以读写的才会被保留
             //timeout 传 NULL 会一直阻塞直到有结果返回
             $select_result = @stream_select($tmp_reads, $tmp_writes, $except_socks, NULL);  
             if(false === $select_result) continue;
@@ -1120,6 +1128,8 @@ class Container extends Base
                 if($read == $this->_mainSocket)
                 {
                     //监测到新的客户端连接请求
+                    //只要socket是可以读那么久表示有一个新连接
+                    //使用stream_socket_accept 将 套接字 转化成 资源流
                     $new_socket = @stream_socket_accept($this->_mainSocket, 0, $remote_address);
                     if(!$new_socket) continue;
 
