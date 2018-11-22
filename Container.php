@@ -193,7 +193,7 @@ class Container extends Base
         //依据数量fork多个子进程
         self::forkContainers();
 
-
+        //监控主进程监控子进程是否退出
         self::monitorContainers();
 	}
 
@@ -713,12 +713,20 @@ class Container extends Base
      */
     static protected function monitorContainers()
     {
+        //主进程启动
         self::$_status = self::STATUS_RUNNING;
         while (1) 
         {
+            //触发信号通知
             pcntl_signal_dispatch();
             $status = 0;
+            //这里将刮起知道有子进程退出或接收到一个信号要求中断当前进程或调用一个信号处理函数
+            //option可选值
+            //WNOHANG	如果没有子进程退出立刻返回。
+            //WUNTRACED	子进程已经退出并且其状态未报告时返回。
+            //返回退出的子进程pid,-1错误,0没有子进程
             $child_pid = pcntl_wait($status, WUNTRACED);
+
             pcntl_signal_dispatch();
 
             //if a child has already exited
@@ -736,6 +744,7 @@ class Container extends Base
                         unset(self::$_pidMap[$hash_id][$child_pid]);
 
                         //mark id available
+                        //将这个pid位置值恢复到0
                         $id = self::getOneContainerId($hash_id, $child_pid);
                         self::$_idMap[$hash_id][$id] = 0;
 
