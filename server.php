@@ -17,7 +17,7 @@ while(1){
     $tmp_read=$reads;
     $tmp_write=$writes;
     //如果没有就阻塞
-    $r=stream_select($tmp_read,$tmp_write,$tmp_error,5);
+    $r=stream_select($tmp_read,$tmp_write,$tmp_error,null);
     if($r===false){
        exit('失败!');
     }
